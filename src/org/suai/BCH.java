@@ -37,11 +37,11 @@ public class BCH {
         t = (d-1)/2;
         String tmp = "1";
         alpha = new Polynom[n];
-        System.out.println("Used this primitive polynomial: " + prime[m]);
+        System.out.println("Был использован следующий примитивный многочлен: " + prime[m]);
         for (int i = 0; i < n; i++){
             alpha[i] = new Polynom(tmp, 2).mod(prime[m]);
             tmp += "0";
-            System.out.println("alpha^" + i + " = " + alpha[i]);
+            System.out.println("\u03B1^" + i + " = " + alpha[i]);
         }
         ArrayList<ArrayList<Integer>> ctc = new ArrayList<>();
         int cur = 0;
@@ -63,14 +63,14 @@ public class BCH {
                 } while (k != i);
             }
         }
-        System.out.println("Cyclotomic classes: " + ctc);
-        System.out.println(Arrays.toString(a));
+        System.out.println("Циклотомические классы: " + ctc);
+        //System.out.println(Arrays.toString(a));
         ArrayList<Polynom> minpol = new ArrayList<>(ctc.size());
         minpol.add(new Polynom("11", 2));
         for (int i = 1; i < ctc.size(); i++){
             minpol.add(findMinPol(alpha, ctc.get(i)));
         }
-        System.out.println("Minimal polynomials: " + minpol);
+        System.out.println("Минимальные многочлены для них: " + minpol);
         ArrayList<Polynom> usedminpol = new ArrayList<>(ctc.size());
         for (int i = 1; i <= t*2; i++)
             usedminpol.add(minpol.get(a[i]));
@@ -80,7 +80,7 @@ public class BCH {
                     usedminpol.remove(j--);
             }
         }
-        System.out.println("Used polynomials: " + usedminpol);
+        System.out.println("Использовались следующие многочлены из минимальных: " + usedminpol);
         g = usedminpol.get(0);
         k = 1;
         while (k < usedminpol.size())
@@ -346,7 +346,7 @@ public class BCH {
             }
             tmpp = new Polynom(sb.toString(), 2);
         }
-        System.out.println("Components of syndrome: " + Arrays.toString(S));
+        System.out.println("Компоненты синдрома: " + Arrays.toString(S));
 
         int[] el = null;
         int v = 1;
@@ -365,14 +365,19 @@ public class BCH {
         }
 
         if (v > 0 && alert == 1) {
-            System.out.println("Error locator polynomials found using BM algorithm: " + Arrays.toString(el));
+            //System.out.println("Error locator polynomials found using BM algorithm: " + Arrays.toString(el));
             int[] errors = new int[v];
+            Arrays.fill(errors, -1);
             int counter = 0;
             int[] res = new int[v + 1];
             for (int i = 0; i < n; i++){
                 res[0] = 0;
-                for (int j = v; j >= 1; j--)
-                    res[j] = (i*j + el[j]) % n;
+                for (int j = v; j >= 1; j--) {
+                    if (el[j] == -1)
+                        res[j] = -1;
+                    else
+                        res[j] = (i * j + el[j]) % n;
+                }
                 Arrays.sort(res);
                 StringBuilder sb = new StringBuilder();
                 int k = res.length - 1;
@@ -393,7 +398,14 @@ public class BCH {
                 tmppp = tmppp.mod(prime[m]);
                 if (tmppp.isZero()) errors[counter++] = (n - i) % n;
             }
-            System.out.println("Errors on index: " + Arrays.toString(errors));
+            for (int i = 0; i < v; i++){
+                if (errors[i] == -1){
+                    System.out.println("В принятом слове более " + t + " ошибок");
+                    return "ОШИБКА";
+                }
+            }
+            System.out.println("Полином локаторов ошибок, найденный при помощи алгоритма БМ: " + Arrays.toString(el));
+            System.out.println("Ошибки произошли в следующих степенях: " + Arrays.toString(errors));
             Arrays.sort(errors);
             StringBuilder sb = new StringBuilder();
             int k = errors.length - 1;
@@ -463,10 +475,16 @@ public class BCH {
         while (r < 2*t){
             r++;
             delta.clear();
+            int q = 0;
             for (int i = 0; i <= L; i++){
-                if (S[r-i-1] == -1)
+                if (S[r-i-1] == -1) {
+                    if (E.get(q).x == i)
+                        q++;
                     continue;
-                int tmp = (E.get(i).a + S[r-i-1]) % n;
+                }
+                if (E.get(q).x != i)
+                    continue;
+                int tmp = (E.get(q++).a + S[r-i-1]) % n;
                 int[] degs = alpha[tmp].getNums();
                 for (int j = 0; j < degs.length; j++){
                     if (degs[j] == 1)
@@ -510,10 +528,10 @@ public class BCH {
 
             if (deltaR != -1){
                 T.clear();
-                for (int q = 0; q < B.size(); q++){
+                for (q = 0; q < B.size(); q++){
                     T.add(new Elem(B.get(q).x+1, (B.get(q).a + deltaR)% n));
                 }
-                for (int q = 0; q < E.size(); q++){
+                for (q = 0; q < E.size(); q++){
                     T.add(new Elem(E.get(q).x, E.get(q).a));
                 }
                 ////////Надо ли выравнивать степени по иксам в Т(х)?
@@ -525,11 +543,90 @@ public class BCH {
                         B.add(new Elem(E.get(i).x, (E.get(i).a - deltaR + n) % n));
                     }
                     E = (ArrayList<Elem>) T.clone();
+                    for (int i = 0; i < E.size() - 1; i++){
+                        int j = i+1;
+                        int a = 0;
+                        int x = E.get(i).x;
+                        ArrayList<Integer> degs = new ArrayList<>();
+                        degs.add(E.get(i).a);
+                        while (j < E.size() && E.get(j).x == E.get(i).x){
+                            degs.add(E.get(j).a);
+                            j++;
+                        }
+                        if (degs.size() < 2)
+                            continue;
+                        int[] pol = new int[degs.size()];
+                        for (j = 0; j < degs.size(); j++) {
+                            pol[j] = degs.get(j);
+                        }
+                        Arrays.sort(pol);
+                        StringBuilder sb = new StringBuilder();
+                        int k = pol.length - 1;
+                        for (j = pol[pol.length - 1]; j >= 0; j--) {
+                            if (k >= 0 && pol[k] == j) {
+                                k--;
+                                sb.append("1");
+                            } else sb.append("0");
+                        }
+                        Polynom tmpp = new Polynom(sb.toString(), 2);
+                        tmpp = tmpp.mod(prime[m]);
+                        for (j = 0; j < n; j++) {
+                            if (tmpp.equals(alpha[j]))
+                                a = j;
+                        }
+                        for (j = 0; j < E.size(); j++){
+                            if (E.get(j).x == x)
+                                E.remove(j--);
+                        }
+                        E.add(new Elem(x, a));
+                        i--;
+                    }
+                    E.sort(comparator);
+
                     L = r - L;
                     continue;
                 }
 
                 E = (ArrayList<Elem>) T.clone();
+                for (int i = 0; i < E.size() - 1; i++){
+                    int j = i+1;
+                    int a = 0;
+                    int x = E.get(i).x;
+                    ArrayList<Integer> degs = new ArrayList<>();
+                    degs.add(E.get(i).a);
+                    while (j < E.size() && E.get(j).x == E.get(i).x){
+                        degs.add(E.get(j).a);
+                        j++;
+                    }
+                    if (degs.size() < 2)
+                        continue;
+                    int[] pol = new int[degs.size()];
+                    for (j = 0; j < degs.size(); j++) {
+                        pol[j] = degs.get(j);
+                    }
+                    Arrays.sort(pol);
+                    StringBuilder sb = new StringBuilder();
+                    int k = pol.length - 1;
+                    for (j = pol[pol.length - 1]; j >= 0; j--) {
+                        if (k >= 0 && pol[k] == j) {
+                            k--;
+                            sb.append("1");
+                        } else sb.append("0");
+                    }
+                    Polynom tmpp = new Polynom(sb.toString(), 2);
+                    tmpp = tmpp.mod(prime[m]);
+                    for (j = 0; j < n; j++) {
+                        if (tmpp.equals(alpha[j]))
+                            a = j;
+                    }
+                    for (j = 0; j < E.size(); j++){
+                        if (E.get(j).x == x)
+                            E.remove(j--);
+                    }
+                    E.add(new Elem(x, a));
+                    i--;
+                }
+                E.sort(comparator);
 
             }
 
@@ -581,14 +678,18 @@ public class BCH {
             i--;
 
         }
+        E.sort(comparator);
 
-
-        if(!(E.size()-1 == L)){
+        if(!(E.get(E.size()-1).x == L)){
             return null;
         }
-        int[] res = new int[E.size()];
-        for (int i = 0; i < E.size(); i++){
-            res[i] = E.get(i).a;
+        int[] res = new int[E.get(E.size()-1).x + 1];
+        int q = 0;
+        for (int i = 0; i < res.length; i++){
+            if (E.get(q).x == i)
+                res[i] = E.get(q++).a;
+            else
+                res[i] = -1;
         }
         return res;
     }
