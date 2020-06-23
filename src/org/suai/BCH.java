@@ -3,6 +3,7 @@ package org.suai;
 import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 
 public class BCH {
     private int n;
@@ -300,6 +301,296 @@ public class BCH {
             promrez = "0" + promrez;
 
         return promrez.substring(0, n-g.getDeg());
+    }
+
+    public String decodingBM(String str){
+        String promrez;
+        Polynom s = new Polynom(str, 2);
+        int[] S = new int[t*2];
+        Arrays.fill(S, -1);
+        int[] nums = s.getNums();
+        ArrayList<Integer> degs = new ArrayList<>();
+        for (int i = 0; i < nums.length; i++){
+            if (nums[i] == 1)
+                degs.add(i);
+        }
+        int[] origdeg = degs.stream().mapToInt(i -> i).toArray();
+        int[] deg = degs.stream().mapToInt(i -> i).toArray();
+        Polynom tmpp = new Polynom(0, s);
+        for (int i = 0; i < S.length; i++){
+            tmpp = tmpp.mod(prime[m]);
+            for (int j = 0; j < alpha.length; j++){
+                if (tmpp.equals(alpha[j])){
+                    S[i] = j;
+                    break;
+                }
+            }
+            for (int j = 0; j < deg.length; j++) {
+                deg[j] = (origdeg[j] * (i + 2)) % n;
+            }
+            Arrays.sort(deg);
+            StringBuilder sb = new StringBuilder();
+            int k = deg.length - 1;
+            for (int j = n-1; j >= 0; j--){
+                if (k >= 0 && j == deg[k]) {
+                    if (k-1 >= 0 && j == deg[k-1]){
+                        k -= 2;
+                        j++;
+                        continue;
+                    }
+                    sb.append("1");
+                    k--;
+                }
+                else
+                    sb.append("0");
+            }
+            tmpp = new Polynom(sb.toString(), 2);
+        }
+        System.out.println("Components of syndrome: " + Arrays.toString(S));
+
+        int[] el = null;
+        int v = 1;
+        int alert = 0;
+        for (int i = 0; i < S.length; i++){
+            if (S[i] != -1) {
+                alert = 1;
+                el = BM(S);
+                if (el == null){
+                    System.out.println("В принятом слове более " + t + " ошибок");
+                    return "ОШИБКА";
+                }
+                v = el.length-1;
+                break;
+            }
+        }
+
+        if (v > 0 && alert == 1) {
+            System.out.println("Error locator polynomials found using BM algorithm: " + Arrays.toString(el));
+            int[] errors = new int[v];
+            int counter = 0;
+            int[] res = new int[v + 1];
+            for (int i = 0; i < n; i++){
+                res[0] = 0;
+                for (int j = v; j >= 1; j--)
+                    res[j] = (i*j + el[j]) % n;
+                Arrays.sort(res);
+                StringBuilder sb = new StringBuilder();
+                int k = res.length - 1;
+                for (int j = n-1; j >= 0; j--){
+                    if (k >= 0 && j == res[k]) {
+                        if (k-1 >= 0 && j == res[k-1]){
+                            k -= 2;
+                            j++;
+                            continue;
+                        }
+                        sb.append("1");
+                        k--;
+                    }
+                    else
+                        sb.append("0");
+                }
+                Polynom tmppp = new Polynom(sb.toString(), 2);
+                tmppp = tmppp.mod(prime[m]);
+                if (tmppp.isZero()) errors[counter++] = (n - i) % n;
+            }
+            System.out.println("Errors on index: " + Arrays.toString(errors));
+            Arrays.sort(errors);
+            StringBuilder sb = new StringBuilder();
+            int k = errors.length - 1;
+            for (int j = n-1; j >= 0; j--){
+                if (k >= 0 && j == errors[k]) {
+                    if (k-1 >= 0 && j == errors[k-1]){
+                        k -= 2;
+                        j++;
+                        continue;
+                    }
+                    sb.append(j < nums.length ? ((nums[j]+1) % 2) : 1);
+                    k--;
+                }
+                else
+                    sb.append(j < nums.length ? nums[j] : 0);
+            }
+
+            promrez = sb.toString();
+        }
+        else
+            promrez = s.toString();
+
+        while (promrez.length() != n)
+            promrez = "0" + promrez;
+
+        return promrez.substring(0, n-g.getDeg());
+    }
+
+    public int[] BM(int[] S){
+
+        class Elem{
+            public int x;
+            public int a;
+
+            public Elem(int x, int a){
+                this.x = x;
+                this.a = a;
+            }
+
+            public Elem mult(Elem other){
+                return new Elem((x + other.x), ((a + other.a)%n));
+            }
+
+            public boolean equals(Elem other){
+                if (a == other.a && x == other.x) return true;
+                return false;
+            }
+        }
+        Comparator<Elem> comparator = new Comparator<Elem>() {
+            @Override
+            public int compare(Elem elem, Elem t1) {
+                if (elem.x < t1.x) return -1;
+                if (elem.x > t1.x) return 1;
+                return 0;
+            }
+        };
+
+        int r = 0;
+        int L = 0;
+        int deltaR = -1;
+        ArrayList<Elem> B = new ArrayList<>();
+        ArrayList<Elem> E = new ArrayList<>();
+        ArrayList<Elem> T = new ArrayList<>();
+        ArrayList<Integer> delta = new ArrayList<>();
+        B.add(new Elem(0, 0));
+        E.add(new Elem(0, 0));
+        while (r < 2*t){
+            r++;
+            delta.clear();
+            for (int i = 0; i <= L; i++){
+                if (S[r-i-1] == -1)
+                    continue;
+                int tmp = (E.get(i).a + S[r-i-1]) % n;
+                int[] degs = alpha[tmp].getNums();
+                for (int j = 0; j < degs.length; j++){
+                    if (degs[j] == 1)
+                        delta.add(j);
+                }
+            }
+            for (int i = 0; i < delta.size() - 1; i++){
+                for (int j = i + 1; j < delta.size(); j++){
+                    if (delta.get(i).equals(delta.get(j))){
+                        delta.remove(j);
+                        delta.remove(i--);
+                        break;
+                    }
+                }
+            }
+            if (!delta.isEmpty()) {
+                int[] pol = new int[delta.size()];
+                for (int i = 0; i < delta.size(); i++) {
+                    pol[i] = delta.get(i);
+                }
+                Arrays.sort(pol);
+                StringBuilder sb = new StringBuilder();
+                int k = pol.length - 1;
+                for (int i = pol[pol.length - 1]; i >= 0; i--) {
+                    if (k >= 0 && pol[k] == i) {
+                        k--;
+                        sb.append("1");
+                    } else sb.append("0");
+                }
+                Polynom tmpp = new Polynom(sb.toString(), 2);
+                for (int i = 0; i < n; i++) {
+                    if (tmpp.equals(alpha[i]))
+                        deltaR = i;
+                }
+            }
+            else {
+                deltaR = -1;
+            }
+
+
+
+            if (deltaR != -1){
+                T.clear();
+                for (int q = 0; q < B.size(); q++){
+                    T.add(new Elem(B.get(q).x+1, (B.get(q).a + deltaR)% n));
+                }
+                for (int q = 0; q < E.size(); q++){
+                    T.add(new Elem(E.get(q).x, E.get(q).a));
+                }
+                ////////Надо ли выравнивать степени по иксам в Т(х)?
+                T.sort(comparator);
+
+                if (2*L <= r-1){
+                    B.clear();
+                    for (int i = 0; i < E.size(); i++){
+                        B.add(new Elem(E.get(i).x, (E.get(i).a - deltaR + n) % n));
+                    }
+                    E = (ArrayList<Elem>) T.clone();
+                    L = r - L;
+                    continue;
+                }
+
+                E = (ArrayList<Elem>) T.clone();
+
+            }
+
+            for (int i = 0; i < B.size(); i++){
+                B.get(i).x++;
+            }
+
+
+
+        }
+
+        //сплюсовать альфы в е с одинаковыми степенями при икс
+        for (int i = 0; i < E.size() - 1; i++){
+            int j = i+1;
+            int a = 0;
+            int x = E.get(i).x;
+            ArrayList<Integer> degs = new ArrayList<>();
+            degs.add(E.get(i).a);
+            while (j < E.size() && E.get(j).x == E.get(i).x){
+                degs.add(E.get(j).a);
+                j++;
+            }
+            if (degs.size() < 2)
+                continue;
+            int[] pol = new int[degs.size()];
+            for (j = 0; j < degs.size(); j++) {
+                pol[j] = degs.get(j);
+            }
+            Arrays.sort(pol);
+            StringBuilder sb = new StringBuilder();
+            int k = pol.length - 1;
+            for (j = pol[pol.length - 1]; j >= 0; j--) {
+                if (k >= 0 && pol[k] == j) {
+                    k--;
+                    sb.append("1");
+                } else sb.append("0");
+            }
+            Polynom tmpp = new Polynom(sb.toString(), 2);
+            tmpp = tmpp.mod(prime[m]);
+            for (j = 0; j < n; j++) {
+                if (tmpp.equals(alpha[j]))
+                    a = j;
+            }
+            for (j = 0; j < E.size(); j++){
+                if (E.get(j).x == x)
+                    E.remove(j--);
+            }
+            E.add(new Elem(x, a));
+            i--;
+
+        }
+
+
+        if(!(E.size()-1 == L)){
+            return null;
+        }
+        int[] res = new int[E.size()];
+        for (int i = 0; i < E.size(); i++){
+            res[i] = E.get(i).a;
+        }
+        return res;
     }
 
     public int[] findErLoc(int[][] Mobr, int[][]Sobr){
