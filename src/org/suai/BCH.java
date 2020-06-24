@@ -37,7 +37,7 @@ public class BCH {
         t = (d-1)/2;
         String tmp = "1";
         alpha = new Polynom[n];
-        System.out.println("Был использован следующий примитивный многочлен: " + prime[m]);
+        System.out.println("Для построения поля был использован \nследующий примитивный многочлен: " + prime[m]);
         for (int i = 0; i < n; i++){
             alpha[i] = new Polynom(tmp, 2).mod(prime[m]);
             tmp += "0";
@@ -177,7 +177,11 @@ public class BCH {
         Polynom m = new Polynom(message, 2);
         m = new Polynom(g.getDeg(), m);
         Polynom res = m.mod(g).add(m);
-        return res.toString();
+        String promrez = res.toString();
+        while (promrez.length() != n)
+            promrez = "0" + promrez;
+
+        return promrez;
     }
 
     public String decoding(String str){

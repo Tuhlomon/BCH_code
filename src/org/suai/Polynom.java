@@ -30,7 +30,7 @@ public class Polynom {
         nums = new int[deg+1];
         char[] c = oldPoly.toCharArray();
         int i = 0;
-        while (c[i++] == '0') deg--;
+        while (c[i++] == '0' && deg > 0) deg--;
         nums = new int[deg+1];
         int k = 0;
         for (i = oldPoly.length()-1; i >= oldPoly.length()-deg-1; i--) {
